@@ -1,3 +1,5 @@
+// https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Function/apply
+
 Function.prototype.myApply = function(thisArg, argArray) {
   if (thisArg) {
     thisArg.fn = this // 把要调用的函数挂载在thisArg对象上

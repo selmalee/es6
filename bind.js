@@ -1,3 +1,5 @@
+// https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Function/bind
+
 Function.prototype.myBind = function(thisArg, ...argArray) {
   var BoundTargetFunction = this
   function bindFn() {

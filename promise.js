@@ -1,42 +1,89 @@
-function MyPromise(fn) {
-  this.status = 'pending'
-  this.result = null
-  this.stack = []
-  // this.fufillQueue = []
-  // this.rejectQueue = []
-  fn(this.resolve.bind(this), this.reject.bind(this))
-  // 私有方法
-  // 返回一个状态由给定value决定的Promise对象。如果该值是thenable(即，带有then方法的对象)，返回的Promise对象的最终状态由then方法执行决定；否则的话(该value为空，基本类型或者不带then方法的对象),返回的Promise对象状态为fulfilled，并且将该value传递给对应的then方法。通常而言，如果你不知道一个值是否是Promise对象，使用Promise.resolve(value) 来返回一个Promise对象,这样就能将该value以Promise对象形式使用。
-  this.resolve = (result) => {
-    this.result = result
-    this.status = 'fufilled'
-  }
-  // 返回一个状态为失败的Promise对象，并将给定的失败信息传递给对应的处理方法
-  this.reject = (error) => {
-    this.result = error
-    this.status = 'rejected'
-  }
+var { isFunction } = require('./utils/index')
+
+var PENDING = 0
+var FULFILLED = 1
+var REJECTED = 2
+
+function doResolve(thisArg, value) {
+  thisArg.status = FULFILLED
+  thisArg.value = value
+  thisArg.queue.forEach(item => {
+    item.callFulfilled(value)
+  })
 }
-// 原型方法
-// 添加解决(fulfillment)和拒绝(rejection)回调到当前 promise, 返回一个新的 promise, 将以回调的返回值来resolve.
-MyPromise.prototype.then = (onFulfilled, onRejected) => {
-  const { status, stack, value } = this
-  const promise = new MyPromise()
-  if (status === 'pending') {
-    stack.push({onFulfilled, onRejected, promise})
-  } else if (status === 'fufilled') {
+
+function doReject(thisArg, value) {
+  thisArg.status = REJECTED
+  thisArg.value = value
+  thisArg.queue.forEach(item => {
+    item.callRejected(value)
+  })
+}
+
+function QueueItem(promise, onFulfilled, onRejected) {
+  this.promise = promise
+  this.callFulfilled = function(value) {
     onFulfilled(value)
-  } else {
-    onRejected(value)
+    doResolve(promise, value)
   }
+  this.callRejected = function(value) {
+    onRejected(value)
+    doResolve(promise, value)
+  }
+}
+
+function MyPromise(executor) {
+  if (!isFunction(executor)) {
+    throw new TypeError('resolver must be a function')
+  }
+  this.status = PENDING
+  this.value = undefined
+  this.queue = []
+
+  this.resolve = function(value) {
+    doResolve(this, value)
+  }
+  this.reject = function(value) {
+    doReject(this, value)
+  }
+  executor(this.resolve.bind(this), this.reject.bind(this))
+}
+
+MyPromise.prototype.then = function(onFulfilled, onRejected) {
+  if (!isFunction(onFulfilled) && this.state === FULFILLED ||
+    !isFunction(onRejected) && this.state === REJECTED) {
+    return this;
+  }
+  var promise = new MyPromise(function(){})
+  this.queue.push(new QueueItem(promise, onFulfilled, onRejected))
   return promise
 }
-// 添加一个拒绝(rejection) 回调到当前 promise, 返回一个新的promise。当这个回调函数被调用，新 promise 将以它的返回值来resolve，否则如果当前promise 进入fulfilled状态，则以当前promise的完成结果作为新promise的完成结果.
-MyPromise.prototype.catch = (onRejected) => { 
+
+MyPromise.prototype.catch = function(onRejected) {
+  var promise = new MyPromise(function(){})
+  this.queue.push(new QueueItem(promise, undefined, onRejected))
   return promise
 }
 
 
-const p = new MyPromise((resolve) => {resolve(1)})
-console.log(p)
-console.log(p.then(() => {console.log(222)}))
+var promise = new MyPromise((resolve) => {
+  setTimeout(() => {
+    console.log('resolve')
+    resolve('haha')
+  }, 1000)
+})
+// 当最外层的 promise 状态改变时，遍历它的 queue 数组调用对应的回调，设置子 promise 的 status 和 value 并遍历它的 queue 数组调用对应的回调，然后设置孙 promise 的 status 和 value 并遍历它的 queue 数组调用对应的回调......依次类推
+promise
+  .then((res) => {
+    console.log(res)
+    // console.dir(promise, { depth: 10 })
+    return res
+  })
+  .then(() => {
+    console.log('then2')
+  })
+  .then(() => {
+    console.log('then3')
+    // console.dir(promise, { depth: 10 })
+  })
+// console.dir(promise, { depth: 10 })
