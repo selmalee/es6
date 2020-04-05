@@ -1,6 +1,12 @@
 // https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Function/call
 
 Function.prototype.myCall = function(thisArg, ...argArray) {
+  if (typeof argArray !== 'object' || typeof thisArg !== 'object') {
+    throw new TypeError('param type error')
+  }
+  if(!argsArray){
+    argsArray = []
+  }
   if (thisArg) {
     thisArg.fn = this // 把要调用的函数挂载在thisArg对象上
     const result = thisArg.fn(...argArray)
@@ -30,4 +36,5 @@ function Food(name, price) {
   this.category = 'food';
 }
 
-console.log(new Food('cheese', 5).name);
+const food = new Food('cheese', 5)
+console.log(food.name);
